@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Canvassed Points & GIS Layers</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        #map { width: 100%; height: 600px; }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <script>
+        var map = L.map('map').setView([35.0844, -106.6504], 11);
+
+        // Base map layers
+        var streetMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var satelliteMap = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenTopoMap contributors'
+        });
+
+        // Function to load GeoJSON layers dynamically
+        function loadGeoJSON(url, layerName, styleOptions, isPointLayer = false) {
+            return fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    var layer = L.geoJson(data, {
+                        pointToLayer: function (feature, latlng) {
+                            return isPointLayer ? L.circleMarker(latlng, { 
+                                radius: 5, 
+                                fillColor: styleOptions.color, 
+                                color: "#000", 
+                                weight: 1, 
+                                opacity: 1, 
+                                fillOpacity: 0.8 
+                            }) : L.marker(latlng);
+                        },
+                        style: function () {
+                            return styleOptions;
+                        },
+                        onEachFeature: function (feature, layer) {
+                            var popupContent = `<b>${layerName}</b>`;
+                            if (feature.properties) {
+                                Object.keys(feature.properties).forEach(key => {
+                                    popupContent += `<br><b>${key}:</b> ${feature.properties[key]}`;
+                                });
+                            }
+                            layer.bindPopup(popupContent);
+                        }
+                    });
+                    return layer;
+                })
+                .catch(error => console.error('Error loading ' + layerName + ':', error));
+        }
+
+        // Layer storage
+        var overlayLayers = {};
+
+        // Load Default Layer (Canvassed Points)
+        loadGeoJSON(
+            'https://raw.githubusercontent.com/mckeont/Bern_PublicArt_geojsons/main/CountyCity_Identifier.geojson',
+            "Canvassed Points",
+            { color: 'blue' },
+            true
+        ).then(layer => {
+            layer.addTo(map);
+            overlayLayers["Canvassed Points"] = layer;
+        });
+
+        // Load Toggleable Layers
+        Promise.all([
+            loadGeoJSON(
+                'https://raw.githubusercontent.com/mckeont/Bern_PublicArt_geojsons/main/Albuquerque.geojson',
+                "Albuquerque Boundary",
+                { color: 'red', weight: 2, fillOpacity: 0.3 }
+            ),
+            loadGeoJSON(
+                'https://raw.githubusercontent.com/mckeont/Bern_PublicArt_geojsons/main/Census_ArtDensity.geojson',
+                "Census Art Density",
+                { color: 'orange', weight: 1, fillOpacity: 0.5 }
+            ),
+            loadGeoJSON(
+                'https://raw.githubusercontent.com/mckeont/Bern_PublicArt_geojsons/main/NineLandGrant_Merge.geojson',
+                "Nine Land Grant",
+                { color: 'purple', weight: 2, fillOpacity: 0.5 }
+            ),
+            loadGeoJSON(
+                'https://raw.githubusercontent.com/mckeont/Bern_PublicArt_geojsons/main/zipcodes__MODES.geojson',
+                "Zip Code Modes",
+                { color: 'brown', weight: 2, fillOpacity: 0.5 }
+            ),
+            loadGeoJSON(
+                'https://raw.githubusercontent.com/mckeont/Bern_PublicArt_geojsons/main/KnownCity.geojson',
+                "Known City",
+                { color: 'green', weight: 1, fillOpacity: 0.4 }
+            ),
+            loadGeoJSON(
+                'https://raw.githubusercontent.com/mckeont/Bern_PublicArt_geojsons/main/KnownCounty.geojson',
+                "Known County",
+                { color: 'blue', weight: 1, fillOpacity: 0.4 }
+            ),
+            loadGeoJSON(
+                'https://raw.githubusercontent.com/mckeont/Bern_PublicArt_geojsons/main/Modes_Artistwithsigs.geojson',
+                "Modes with Artist Signatures",
+                { color: 'pink', weight: 2, fillOpacity: 0.5 }
+            )
+        ]).then(layers => {
+            overlayLayers["Albuquerque Boundary"] = layers[0];
+            overlayLayers["Census Art Density"] = layers[1];
+            overlayLayers["Nine Land Grant"] = layers[2];
+            overlayLayers["Zip Code Modes"] = layers[3];
+            overlayLayers["Known City"] = layers[4];
+            overlayLayers["Known County"] = layers[5];
+            overlayLayers["Modes with Artist Signatures"] = layers[6];
+
+            // Add Layer Control (collapsible)
+            L.control.layers(null, overlayLayers, { collapsed: true }).addTo(map);
+        });
+
+    </script>
+
+</body>
+</html>
